@@ -1,0 +1,94 @@
+---
+title: "Activity tracking exercise quality"
+author: "Antti Loukiala"
+date: "03/26/2016"
+output: html_document
+---
+
+# Abstract
+
+Activity trackers give great amount of data about the movement of the subject, but for now very little about the quality of the movement. In this paper we study the quality of the movement by using a data recorded during weightlifting. With the data the quality can be estimated with fairly good accuracy, even with reasonable amount of data points. 
+
+# Data
+
+There are various amount of data points for the measuring. The data can be grouped into four different groups, arms, forearms, belt and dumbbell. Each of the group consists of different type of measures, combined to give a idea of how the subject in study is moving. Lot of the sensors give very little data and those ones can be discarded right away. 
+
+```{r, DataReading}
+setwd("/home/antti/Desktop/DataScience/PracticalMachineLearning")
+d = read.csv("pml-training.csv")
+
+str(d)
+summary(d)
+library(dplyr)
+predictors <- dplyr::select(d, 
+                     roll_belt, pitch_belt, yaw_belt, 
+                     total_accel_belt,
+                     gyros_belt_x, gyros_belt_y, gyros_belt_z,
+                     accel_belt_x, accel_belt_y, accel_belt_z,
+                     magnet_belt_x, magnet_belt_y, magnet_belt_z, 
+                     roll_arm, pitch_arm, yaw_arm, total_accel_arm,
+                     total_accel_arm,
+                     gyros_arm_x, gyros_arm_y, gyros_arm_z,
+                     accel_arm_x, accel_arm_y, accel_arm_z,
+                     magnet_arm_x, magnet_arm_y, magnet_arm_z,
+                     roll_dumbbell, pitch_dumbbell, yaw_dumbbell, 
+                     total_accel_dumbbell,
+                     gyros_dumbbell_x, gyros_dumbbell_y, gyros_dumbbell_z,
+                     accel_dumbbell_x, accel_dumbbell_y, accel_dumbbell_z,
+                     magnet_dumbbell_x, magnet_dumbbell_y, magnet_dumbbell_z,
+                     roll_forearm, pitch_forearm, yaw_forearm,
+                     total_accel_forearm, 
+                     gyros_forearm_x, gyros_forearm_y, gyros_forearm_z, 
+                     accel_forearm_x, accel_forearm_y, accel_forearm_z,
+                     magnet_forearm_x, magnet_forearm_y, magnet_forearm_z)
+bel <- dplyr::select(d, roll_dumbbell, pitch_dumbbell, yaw_dumbbell, 
+                     total_accel_dumbbell,
+                     gyros_dumbbell_x, gyros_dumbbell_y, gyros_dumbbell_z,
+                     accel_dumbbell_x, accel_dumbbell_y, accel_dumbbell_z,
+                     magnet_dumbbell_x, magnet_dumbbell_y, magnet_dumbbell_z)
+totals <- dplyr::select(d, total_accel_belt, total_accel_arm, total_accel_dumbbell, total_accel_forearm)
+
+cor(bel)
+```
+
+Lot of the sensors measure the same thing. For example, there is a high correlation in total acceleration of arms and the acceleration in three dimensions. Therefore we will begin by using only the total data.
+
+# The model
+
+Since we are measuring weightlifting, a good quality movement should be steady all the way. With this idea, the total acceleration can be considered a good indicator in a domain sense. Another one is the dumbbell. The weight should move in a steady fashion for a the duration of the excersice. The model will be build by using random forest for its general use in machine learning.
+
+I will be using k-folds with three folds. The folds will be created based on the classe variable, so that each fold will have the same amount of classe. The testing is done on so that two of the three folds is used to train, and one to test. Accuracy and sample error is measured from there.
+
+We use k-folds to generate test and training sets. We calculate the mean accuracy of the tree different sets.
+
+```{r, ModelBuilding}
+library(dplyr)
+library(caret)
+
+totalsDumb <- dplyr::select(d, total_accel_belt, total_accel_arm, total_accel_dumbbell, 
+                            total_accel_forearm, 
+                            roll_dumbbell, pitch_dumbbell, yaw_dumbbell, 
+                            classe)
+
+set.seed(1)
+trainingContr <- trainControl(method = "cv", number = 4)
+
+model <- train(totalsDumb$classe ~ ., method = "rf", trControl = trainingContr, 
+    totalsDumb)
+
+# Summary of the model and the plot of accuracies
+summary(model)
+plot(model)
+
+# Average of the accuracy
+mean(model[[4]]$Accuracy)
+
+```
+
+The accuracy is around 0.8 and the average of the three tests gives mean of 0.82. This can be considered a good model. The fact that even with this few measurements the time to calculate the model on a personal computer is fairly long. The more data points interest he calculation time significantly. This is also a factor that favors this model.
+
+Estimate of the out of sample error is 18 %. (1-accuracy * 100).
+
+# Output
+
+The data is a measurements recorded from a sensor of subjects doing weightlifting exercise. With the data we can give fairly good estimate of how well the subject is training. The model build in this paper uses idea of following the weight trough out the movement. The model can be kept fairly simple and achieve good results, making it reasonable to be used in real life applications as well. The accuracy can be improved for sure, but for the simplicity, the achieved accuracy can be considered a good one.
